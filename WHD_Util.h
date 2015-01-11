@@ -37,7 +37,8 @@ class DNOCR_Config;
 #define LOG_WARN 'W'
 #define LOG_INFO 'I'
 #define LOG_ERROR 'E'
-
+#define LOG_VERBOSE 'V' // These are normally sent to serial port but no logged
+#define VERBOSE_LOG_ON true // unless this is true - warning log files can get big!
 
 /*
  ** Global constants
@@ -84,6 +85,7 @@ public:
     // ================ error handling ===============
 
     static void writeLog (char logType, const char *s);   // /log/RMAC000001.LOG etc
+    static void writeLog (char logType, const char *s, const int n);   // /log/RMAC000001.LOG etc
     
     static void fatalError (const char *);  // if program really cannot progress - just sits there flashing LEDs!
      static void fatalError (const char *, const char *);

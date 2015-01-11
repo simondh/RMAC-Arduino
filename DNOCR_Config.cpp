@@ -191,7 +191,7 @@ int DNOCR_Config::startRestoreConfig()
         }
     }
 
-    WHD_Util::writeLog(LOG_INFO, "startRestoreConfig file open");
+    WHD_Util::writeLog(LOG_VERBOSE, "startRestoreConfig file open");
     
     // First read and discard two lines of file that are copyright and title
     readUnarchiveLine(fn, loadFile);

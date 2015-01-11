@@ -238,7 +238,13 @@ void writeLogString (LFile *f, const char *line)
             strcpy(logTypeStr, " Warn "); break;
         case 'E':
             strcpy(logTypeStr, " Error ");break;
-            
+        case 'V' :
+            strcpy(logTypeStr, " Verbose ");
+            if (!VERBOSE_LOG_ON) {
+                return;
+            }
+            break;
+
         default:
             strcpy(logTypeStr, " internal error unknown log type "); break;
     }
@@ -250,6 +256,13 @@ void writeLogString (LFile *f, const char *line)
     writeLogString(&f, CRLF );
 
     f.close();
+}
+
+void WHD_Util::writeLog (char logType, const char *s, const int n)
+{
+    char buff[BUFSIZ];
+    sprintf(buff, "%s : %d", s, n);
+    writeLog(logType, buff);
 }
 
 

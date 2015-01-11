@@ -12,7 +12,7 @@
 #include "WHD_Util.h"
 #include "DNOCR_Config.h"
 #include "DNOCR_Rmac.h"
-
+#include "DNOCR_Mesg.h"
 
 
 // global data  - all the classes restored from config file.
@@ -24,76 +24,16 @@ AuthorisedUsers *authUsers[MaxCertifiedPhones];
 // Global const etc
 #define DEBUG 1
 
+
 /*
- **====================== functions used by main =================
- ** These functions are generally those that operate on soem or all global variables. 
- ** eg save & restore
+ **====================== Forward decalartions =================
+ ** Routines are after main
  **/
 
-void restoreAllFromConfig ()
-{
-    // Restores all classes.
-    // and reload from data file
-    int i;
-    
-    DNOCR_Config restoreObj;
-    
-    
-    restoreObj.startRestoreConfig(); // if there are no config files, this never returns!
-    // restire the main Site object first
-    siteData.unarchive(&restoreObj);
-    siteData.debugON = DEBUG;
-    WHD_Util::writeLog(LOG_INFO, "Single SITE object restored");
+void saveAllToConfig ();
+void restoreAllFromConfig();
 
-    
-    // then all digitalAlarm objects (the no-volt switch, digital pins)
-    for (i = 0; i < MaxDigitalAlarms; i++)
-    {
-        digitalAlarms[i] = new DigitalAlarm(i+1);
-        digitalAlarms[i]->unarchive(&restoreObj, i+1);
-    }
-    WHD_Util::writeLog(LOG_INFO, "All Digital Alarms restored");
 
-    
-    // All authorised users next
-    for (i = 0; i < MaxCertifiedPhones; i++)
-    {
-        authUsers[i] = new AuthorisedUsers(i+1);
-        authUsers[i]->unarchive(&restoreObj, i+1);
-    }
-    WHD_Util::writeLog(LOG_INFO, "All Authorised users restored");
-
-    
-} // restoreAllFromConfig
-
-void saveAllToConfig ()
-{
-    // SAVES all classes to a new config file.
-    int i;
-    DNOCR_Config saveObj;
-
-    WHD_Util::writeLog(LOG_INFO, "Saving ALL classes to RMAC.DAT");
-
-    // Save main site object first
-    saveObj.startSave();
-    siteData.archive(&saveObj);
-    
-    // All digital alarms next
-    for (i = 0; i < MaxDigitalAlarms; i++)
-    {
-        digitalAlarms[i]->archive (&saveObj);
-    }
-    
-    // All authorised users next
-    for (i = 0; i < MaxCertifiedPhones; i++)
-    {
-        authUsers[i]->archive (&saveObj);
-    }
-    // Finally close the file
-    saveObj.closeSave();
-    WHD_Util::writeLog(LOG_INFO, "All classes saved");
-
-} // saveAllToConfig ()
 
 
 /*
@@ -103,8 +43,42 @@ void saveAllToConfig ()
 int main(int argc, const char * argv[]) {
     
 
-    //int i;
-    //char buff [BUFSIZ];
+    int i;
+    char buff [180];
+    
+    WHD_Util::writeLog(LOG_INFO, (char*)"Testing message Q");
+    
+    
+    DNOCR_Mesg *myQ = new DNOCR_Mesg(4);
+    int err;
+    
+    err = myQ->enQueue((char *)"mesg 1");
+    i = myQ->qSize();
+    err = myQ->enQueue((char *)"mesg 2");
+    i = myQ->qSize();
+    err = myQ->enQueue((char *)"mesg 3");
+    i = myQ->qSize();
+    err = myQ->enQueue((char *)"mesg 4");
+    i = myQ->qSize();
+    err = myQ->enQueue((char *)"mesg 5");
+    i = myQ->qSize();
+    err = myQ->deQueue(buff);
+    i = myQ->qSize();
+    err = myQ->deQueue(buff);
+    i = myQ->qSize();
+    err = myQ->deQueue(buff);
+    i = myQ->qSize();
+    err = myQ->deQueue(buff);
+    i = myQ->qSize();
+    err = myQ->deQueue(buff);
+    i = myQ->qSize();
+    err = myQ->deQueue(buff);
+    i = myQ->qSize();
+    
+    
+    
+    
+    exit (11);
     
     WHD_Util::writeLog(LOG_INFO, "RMAC starting up");
 
@@ -124,3 +98,78 @@ int main(int argc, const char * argv[]) {
     
     return 0;
 }
+
+
+
+/*
+ **====================== functions used by main =================
+ ** These functions are generally those that operate on soem or all global variables.
+ ** eg save & restore
+ **/
+
+void restoreAllFromConfig ()
+{
+    // Restores all classes.
+    // and reload from data file
+    int i;
+    
+    DNOCR_Config restoreObj;
+    
+    
+    restoreObj.startRestoreConfig(); // if there are no config files, this never returns!
+    // restire the main Site object first
+    siteData.unarchive(&restoreObj);
+    siteData.debugON = DEBUG;
+    WHD_Util::writeLog(LOG_VERBOSE, "Single SITE object restored");
+    
+    
+    // then all digitalAlarm objects (the no-volt switch, digital pins)
+    for (i = 0; i < MaxDigitalAlarms; i++)
+    {
+        digitalAlarms[i] = new DigitalAlarm(i+1);
+        digitalAlarms[i]->unarchive(&restoreObj, i+1);
+    }
+    WHD_Util::writeLog(LOG_VERBOSE, "All Digital Alarms restored");
+    
+    
+    // All authorised users next
+    for (i = 0; i < MaxCertifiedPhones; i++)
+    {
+        authUsers[i] = new AuthorisedUsers(i+1);
+        authUsers[i]->unarchive(&restoreObj, i+1);
+    }
+    WHD_Util::writeLog(LOG_VERBOSE, "All Authorised users restored");
+    
+    
+} // restoreAllFromConfig
+
+void saveAllToConfig ()
+{
+    // SAVES all classes to a new config file.
+    int i;
+    DNOCR_Config saveObj;
+    
+    WHD_Util::writeLog(LOG_INFO, "Saving ALL classes to RMAC.DAT");
+    
+    // Save main site object first
+    saveObj.startSave();
+    siteData.archive(&saveObj);
+    
+    // All digital alarms next
+    for (i = 0; i < MaxDigitalAlarms; i++)
+    {
+        digitalAlarms[i]->archive (&saveObj);
+    }
+    
+    // All authorised users next
+    for (i = 0; i < MaxCertifiedPhones; i++)
+    {
+        authUsers[i]->archive (&saveObj);
+    }
+    // Finally close the file
+    saveObj.closeSave();
+    WHD_Util::writeLog(LOG_INFO, "All classes saved");
+    
+} // saveAllToConfig ()
+
+
