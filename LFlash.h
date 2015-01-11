@@ -12,6 +12,7 @@
 #include <stdio.h>
 #include <fstream>
 #include <iostream>
+#include <ctime>
 
 
 #define FILE_READ 1
@@ -45,6 +46,56 @@ public:
     static LFile open (const char *fname, int io);
     static  bool mkdir (const char * dirName);
     
+    
+};
+
+/*
+** DateTime
+*/
+
+typedef struct {
+    int year;
+    int mon;
+    int day;
+    int hour;
+    int min;
+    int sec;
+} datetimeInfo;
+
+
+class LDateTimeClass
+{
+public:
+    
+static int getTime(
+            datetimeInfo * time
+            );
+    
+static int getRtc(
+           unsigned int * rtc
+           );
+
+static int setTime( // does nothing in this sim
+            datetimeInfo * time
+            );
+    
+};
+
+class Serial
+{
+    // Emulation for Arduino Serial class
+    // just writes to std::cout
+    // for real - use the Arduino library!
+public:
+    
+    static long print (const char * msg);
+    static long println (const char * msg);
+    static long print (int v );
+    static long println (int v );
+    static long print (float f);
+    static long println (float f);
+//    static long print (bool b);
+//    static long println (bool b);
     
 };
 

@@ -9,64 +9,118 @@
 #include <iostream>
 #include <string>
 #include <fstream>
-
 #include "WHD_Util.h"
 #include "DNOCR_Config.h"
 #include "DNOCR_Rmac.h"
 
-// global SITE class
-Site site;
+
+
+// global data  - all the classes restored from config file.
+Site siteData;
+DigitalAlarm* digitalAlarms[MaxDigitalAlarms];
+AuthorisedUsers *authUsers[MaxCertifiedPhones];
+
+
+// Global const etc
+#define DEBUG 1
+
+/*
+ **====================== functions used by main =================
+ ** These functions are generally those that operate on soem or all global variables. 
+ ** eg save & restore
+ **/
+
+void restoreAllFromConfig ()
+{
+    // Restores all classes.
+    // and reload from data file
+    int i;
+    
+    DNOCR_Config restoreObj;
+    
+    
+    restoreObj.startRestoreConfig(); // if there are no config files, this never returns!
+    // restire the main Site object first
+    siteData.unarchive(&restoreObj);
+    siteData.debugON = DEBUG;
+    WHD_Util::writeLog(LOG_INFO, "Single SITE object restored");
+
+    
+    // then all digitalAlarm objects (the no-volt switch, digital pins)
+    for (i = 0; i < MaxDigitalAlarms; i++)
+    {
+        digitalAlarms[i] = new DigitalAlarm(i+1);
+        digitalAlarms[i]->unarchive(&restoreObj, i+1);
+    }
+    WHD_Util::writeLog(LOG_INFO, "All Digital Alarms restored");
+
+    
+    // All authorised users next
+    for (i = 0; i < MaxCertifiedPhones; i++)
+    {
+        authUsers[i] = new AuthorisedUsers(i+1);
+        authUsers[i]->unarchive(&restoreObj, i+1);
+    }
+    WHD_Util::writeLog(LOG_INFO, "All Authorised users restored");
+
+    
+} // restoreAllFromConfig
+
+void saveAllToConfig ()
+{
+    // SAVES all classes to a new config file.
+    int i;
+    DNOCR_Config saveObj;
+
+    WHD_Util::writeLog(LOG_INFO, "Saving ALL classes to RMAC.DAT");
+
+    // Save main site object first
+    saveObj.startSave();
+    siteData.archive(&saveObj);
+    
+    // All digital alarms next
+    for (i = 0; i < MaxDigitalAlarms; i++)
+    {
+        digitalAlarms[i]->archive (&saveObj);
+    }
+    
+    // All authorised users next
+    for (i = 0; i < MaxCertifiedPhones; i++)
+    {
+        authUsers[i]->archive (&saveObj);
+    }
+    // Finally close the file
+    saveObj.closeSave();
+    WHD_Util::writeLog(LOG_INFO, "All classes saved");
+
+} // saveAllToConfig ()
+
+
+/*
+ **====================== main =================
+ **/
 
 int main(int argc, const char * argv[]) {
     
-//    char buf[257];
-//    std::string b2;
-//    int more = 1;
-//    const char * c ;
-    site.debugON = 1;
-    
-    std::cout << "DNOCR Library test skeleton\n" << std::endl;
-//    while (more) {
-//    
-//        std::cout << "Enter a string to be cleaned or exit\n" << std::endl;
-//        std::getline (std::cin, b2);
-//        c = b2.c_str();
-//        strcpy(buf, c);
-//        std::cout << buf << std::endl;
-//
-//        if (strcmp("exit", buf) == 0) exit(0);
-//        WHD_Util::cleanNumStr(buf);
-//        std::cout << buf << std::endl;
-//        
-//    }
-    
-    std::cout << "Testing class archive\n" << std::endl;
-    
-    // first create empty Site record
-    Site siteData;
-    // and reload from data file
-    DNOCR_Config restoreFile;
-    restoreFile.startRestoreConfig(); // if there are no config files, this never returns!
-    siteData.unarchive(&restoreFile);
-    
-    
-    
-//    siteData.setSiteID((char*)("00001"));
-//    siteData.setSiteShortName ((char*)("SW-East"));
-//    siteData.setSiteLongName((char*)("Swansea east"));
-//    siteData.setLowSecurityPIN((char*)("11111"));
-//    siteData.setHighSecurityPIN((char*)("99999"));
-    
-    
-    DNOCR_Config saveFile;
+
+    //int i;
+    //char buff [BUFSIZ];
     
     WHD_Util::writeLog(LOG_INFO, "RMAC starting up");
-    // Now save it
-    saveFile.startSave();
-    siteData.archive(&saveFile);
-    saveFile.closeSave();
+
+
+    // FIRST get data from teh config files.
+    // IF there are no config files, it never returns and flashes LEDs forever
+    WHD_Util::writeLog(LOG_INFO, "Loading all classes from config file RMAC.DAT");
+
+    restoreAllFromConfig();
     
+    WHD_Util::writeLog(LOG_INFO, "restoration complete, startup routines starting");
+
+
+ 
     
+    saveAllToConfig();
     
     return 0;
 }

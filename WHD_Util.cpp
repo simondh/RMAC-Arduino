@@ -11,6 +11,8 @@
 #include <ctime>
 #include "DNOCR_Config.h"
 #include "WHD_Util.h"
+#include "LFlash.h"
+
 
 #define CRLF "\r\n"  // Windows line termination
 
@@ -18,6 +20,9 @@
   ** WHD_Util - mostly staic utility routines
 */
 
+/*
+ ** ========================== String manipulation & cleaning ===============
+*/
 
 int WHD_Util::safeCopy (char *dest, char *source, int l)
 {
@@ -141,21 +146,60 @@ void WHD_Util::cleanNumStr (char *s)
 }
 
 
+/*
+ ** ========================== date & Time ===============
+ */
 
 
 int WHD_Util::dayOfEpoch()
 {
     // return number of days since 1 Jan 2015
-    time_t  timev;
-    time(&timev);  // returns time since 1/1/1970
+    unsigned int rtc;
     
-    return (int)(timev/(24*60*60) - 45*365 - 10);
+    LDateTimeClass::getRtc(&rtc); // returns time since 1/1/1970
     
+    return (int)(rtc/(24*60*60) - 45*365 - 10); // return days since 1 Jan 2015
 }
+
+void WHD_Util::timeStamp (char *dt, const char *seperators , const datetimeInfo *theDate)
+{
+    // theDate is a date struct with the time to be printed
+    // 3-char separators string gives :
+    // (if s[0] is A, s[1] is B, s[2] is C -> yyyyAmmAddBhhCmmCss
+    // eg (datebuff, "/-:") -> yyyy/mm/dd-hh:mm:ss
+    
+sprintf (dt, "%04d%c%02d%c%02d%c%02d%c%02d%c%02d ",
+         theDate->year, seperators[0], theDate->mon+1, seperators[0], theDate->day,
+         seperators[1],
+         theDate->hour, seperators[2], theDate->min, seperators[2], theDate->sec);
+}
+
+ void WHD_Util::timeStamp (char *dt, const char *seperators )
+{
+    datetimeInfo now;
+    LDateTimeClass::getTime(&now);
+    WHD_Util::timeStamp(dt, seperators, &now);
+}
+
+
+ void WHD_Util::timeStamp (char *dt )
+{
+    // buff must be 22 chars. Returns yyyy-mm-dd hh:mm:ss
+    WHD_Util::timeStamp(dt, (char *)"- :");
+}
+
+
+/*
+ ** ========================== Log file ===============
+ */
 
 void writeLogString (LFile *f, const char *line)
 {
     const char *p;
+    //Also write to serial (which is discarded unless a serial minotor is attached, part of the Arduino IDE
+    // And using my LFlash.h /.cpp, Serial:print reroutes to std::cout
+    
+    Serial::print(line);
     
     p = line;
     while (*p) {
@@ -176,52 +220,72 @@ void writeLogString (LFile *f, const char *line)
     
     int i = dayOfEpoch();
     char logTypeStr[12];
+    char dateTimeStr[30];
     
     // first check /logs exists
     if (!LFlash::exists("LOGS")) {
         LFlash::mkdir("LOGS");
     }
     
-    char fn [10];
+    char fn [32];
     sprintf (fn, "LOGS/RMAC%06d.LOG", i );
-    LFile f = LFlash::open(fn, FILE_WRITE);  // TODO check opens as append (LinkIt should, C++ does not)
-    // TODO put date time here
+    LFile f = LFlash::open(fn, FILE_WRITE);  // TODO: check opens as append (LinkIt should, C++ does not)
+
     switch (logType) {
         case 'I':
-            strcpy(logTypeStr, " Info ");
-            break;
+            strcpy(logTypeStr, " Info "); break;
         case 'W':
-            strcpy(logTypeStr, " Warn ");
-            break;
+            strcpy(logTypeStr, " Warn "); break;
         case 'E':
-            strcpy(logTypeStr, " Error ");
-            break;
+            strcpy(logTypeStr, " Error ");break;
             
         default:
-            strcpy(logTypeStr, " internal error unknown log type ");
-            break;
+            strcpy(logTypeStr, " internal error unknown log type "); break;
     }
     
-    // TODO write time and date here
+    WHD_Util::timeStamp(dateTimeStr);
+    writeLogString(&f, dateTimeStr );
     writeLogString(&f, logTypeStr );
     writeLogString(&f, s );
     writeLogString(&f, CRLF );
-    
-    // TODO local debug
-    std::cout << logTypeStr << " : " << s << std::endl;
 
     f.close();
 }
+
+
+
+/*
+ ** ========================== Error handling ===============
+ */
+
 
  void WHD_Util::fatalError (const char * err)
 {
 // if program really cannot progress - just sits there flashing LEDs!
     writeLog(LOG_ERROR, "Fatal error, program cannot continue");
     writeLog(LOG_ERROR,err );
-    // TODO flash blue and red LEDs continually
+    // TODO: flash blue and red LEDs continually
     
     exit(99);
     
 }
+
+
+void WHD_Util::fatalError (const char * err, const char * attr)
+{
+    char buff[BUFSIZ], *p;
+    p = (char *)attr;
+    if (*p == '&') p++;  // some attributes are &attribute, ignore this
+    sprintf (buff, "%s : %s", err, p);
+    WHD_Util::fatalError(buff);
+}
+
+void WHD_Util::fatalError (const char * err, const int attr)
+{
+    char buff[BUFSIZ];
+    sprintf (buff, "%s : %d", err, attr);
+    WHD_Util::fatalError(buff);
+}
+
 
 

@@ -13,6 +13,11 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
+/**
+ **=================  LFile ===================
+ **/
+
+
 LFile::LFile(const char *fn, int io)
 {
     if (io == 2)
@@ -61,6 +66,10 @@ void LFile::flush()
     // does nothing
 }
 
+/**
+ **=================  LFlash ===================
+ **/
+
 bool LFlash::mkdir (const char * dirName)
 {
     int status;
@@ -96,3 +105,110 @@ LFile LFlash::open (const char *fname, int io)
     
     return f;
 }
+
+/**
+ **=================  LDateTimeClass ===================
+ **/
+
+int LDateTimeClass::getTime(datetimeInfo * theDateTime)
+{
+    // datetimeinfo is a struct , defined in LFlash.h
+    // Returns dat-time values in datetimeInfo struct
+    // same as LTime LinkIt lib
+
+    time_t t = time(0);   // get time now
+    struct tm * now = localtime( & t );
+    theDateTime->year = now->tm_year + 1900;
+    theDateTime->mon = now->tm_mon;
+    theDateTime->hour = now->tm_hour;
+    theDateTime->day = now->tm_mday;
+    theDateTime->min = now->tm_min;
+    theDateTime->sec = now->tm_sec;
+ 
+    // if succeed, return 0, otherwise return -1
+    return 0;
+}
+
+int LDateTimeClass::getRtc(unsigned int * rtc)
+{
+    // get real-time in seconds sine 1/1/1970, into &rtc
+    time_t  timev;
+    time(&timev);  // returns time since 1/1/1970
+    *rtc = (unsigned int) timev;
+    return 0;
+}
+
+int LDateTimeClass::setTime( datetimeInfo * time )
+{
+    // In this OS X sim, this does nothing (as time set anyway)
+    return 0;
+}
+
+
+/**
+ **=================  Serial ===================
+ **/
+
+
+long Serial::print (const char * msg)
+{
+    std::cout << msg;
+    return (strlen(msg));
+}
+
+ long Serial::println (const char * msg)
+{
+    std::cout << msg << std::endl;
+    return (strlen(msg));
+}
+
+ long Serial::print (int v )
+{
+    char buff[32];
+    sprintf (buff, "%d", v);
+    return Serial::print(buff);
+}
+
+ long Serial::println (int v )
+{
+    return(Serial::print(v));
+}
+
+ long Serial::print (float f)
+{
+    char buff[32];
+    sprintf (buff, "%f", f );
+    return Serial::print(buff);
+}
+ long Serial::println (float f)
+{
+    return Serial::print(f);
+}
+
+/*
+long Serial::print (bool b)
+{
+    if (b) {
+        std::cout << "true" << std::endl;
+        return 4;
+    }
+    else {
+        std::cout << "false" << std::endl;
+        return 5;
+    }
+}
+
+ long Serial::println (bool b)
+{
+    if (b) {
+        std::cout << "true" << std::endl;
+        return 4;
+    }
+    else {
+        std::cout << "false" << std::endl;
+        return 5;
+    }
+}
+*/
+
+

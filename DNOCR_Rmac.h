@@ -17,13 +17,12 @@
 #ifndef __DNOCR_LIB__DNOCR_Rmac__
 #define __DNOCR_LIB__DNOCR_Rmac__
 
+#include "LFlash.h"
+
 // define XCODE to dev and test under XCODE, standard C++. Comment out for normal Arduino use
 #define XCODE 1
 
 class DNOCR_Config;
-
-
-
 
 
 /*
@@ -47,8 +46,9 @@ public:
     int setLowSecurityPIN(const char*) ;
     const char * getHighSecurityPIN()const ;
     int setHighSecurityPIN(const char*);
-    void archive (DNOCR_Config *saveFile);
-    void unarchive (DNOCR_Config *restoreFile);
+    void archive (DNOCR_Config *saveObj);
+    void unarchive (DNOCR_Config *restoreObj);
+    Site(); // constructor
 
     
     // Public attributes
@@ -56,6 +56,7 @@ public:
     bool debugON = true;        // set to false for no debug
     int  logFileNumber = 0;     // Simple incrementing number to suffix log files
     static int logFileDay;      // new log is created on startup and on day change. This is day of year used for that
+    datetimeInfo bootupTime;    // actually time the object created
 
 private:
     char siteID[IDLength];              // any string to ID the site
@@ -66,6 +67,42 @@ private:
     
 };
 
+class DigitalAlarm
+{
+    
+public:
+    int alarmNumber;    // 1..8. Constructor inits to 0, which marks it unused.
+    char alarmID[IDLength];
+    char alarmName[LongNameLength];
+    int digitalPin;     // The LinkIt Pin number for the signal
+    bool alarmOnOpen;   // if true, alarm raised on open-circuit == HIGH(?), false alarm on closed circuit == LOW
+    bool silence;       // if TRUE, do not send alarms
+    int retransmitMinutes;  // retransmit any alarms this many minutes
+    bool alarmed;       // true if in alarm now
+    datetimeInfo alarmRaisedTime;
+    datetimeInfo alarmClearedTime;
+    int sessionAlarmCount;     // since startup (in Site object)
+    long globalAlarmCount;       // saved in comnfig files, count since factory reset
+    
+    DigitalAlarm(int alarmNum);  // constructor, does not do much !
+    void archive (DNOCR_Config *saveObj);
+    void unarchive (DNOCR_Config *restoreObj, const int restoreAlarmNum);
+    
+};
+
+
+class AuthorisedUsers
+{
+public:
+    int userNumber; // 1..32
+    char userName[LongNameLength];
+    char phone[MaxPhoneLength];
+    SecurityLevels securityLevel;
+
+    AuthorisedUsers(const int unum);
+    void archive (DNOCR_Config *saveObj);
+    void unarchive (DNOCR_Config *restoreObj, const int restoreAlarmNum);
+};
 
 
 

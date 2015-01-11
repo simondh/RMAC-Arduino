@@ -41,9 +41,11 @@ public:
     int writeSaveString (const char *line);
     // convenience methods to write the Name Value Pair eg writeNVP ("SiteID", 99);
     int writeNVP (const char * name, const char *v);
-    int writeNVP (const char * name, const int v);
+    int writeNVP (const char * name, const long v);  // NOTE to save an int, cast to (long)
     int writeNVP (const char * name, const float v);
     int writeNVP (const char * name, const bool v);
+    int writeNVP (const char * name, const datetimeInfo &dt);
+    
     int closeSave();
     
     
@@ -51,7 +53,10 @@ public:
     bool readNVPCheck (const char *name, const char *value);  // returns error if file NVP does not match name:value
     bool readNVPString (const char *name, char *val, int valLength);  // returns the value as a string
     bool readNVPInt (const char *name, int *val);  // returns the value as a int
+    bool readNVPLong (const char *name, long *val);  // returns the value as a long
     bool readNVPBool (const char *name, bool *val); // bool
+    bool readNVPDateTime (const char * name,  datetimeInfo &dt);
+
     int closeRecover();
     
 private:

@@ -6,7 +6,7 @@
 //
 
 #include "DNOCR_Config.h"
-
+#include "LFlash.h"
 /*
  ** DNOCR_Config - Methods to manage the save and restore of classes from a Flash config file
  ** The LinkitOne has 10MB of Flash memory that is available through the LFlash class.
@@ -123,10 +123,10 @@ int DNOCR_Config::writeNVP (const char * name, const char *v)
     return lLength;
 }
 
-int DNOCR_Config::writeNVP (const char * name, const int n)
+int DNOCR_Config::writeNVP (const char * name, const long n)
 {
     char buff[BUFFSIZE];
-    snprintf(buff, BUFFSIZE, "%d", n);
+    snprintf(buff, BUFFSIZE, "%ld", n);
     return (writeNVP(name, buff));
 }
 
@@ -145,6 +145,15 @@ int DNOCR_Config::writeNVP (const char * name, const bool b)
         return (writeNVP(name, "false"));
 
 }
+
+int DNOCR_Config::writeNVP (const char * name, const datetimeInfo &dt)
+{
+    char buff [64];
+    WHD_Util::timeStamp(buff, (char *)"---", &dt);  // TODO: check dont trust &
+    return writeNVP(name,  buff);
+    return 1;
+}
+
 
 int DNOCR_Config::closeSave()
 {
@@ -208,7 +217,7 @@ int readRawUnarchiveLine (char *line, LFile *f)
     bool isComment = false;
     
     p = line;
-    c = f->f.get();  //TODO will have to change
+    c = f->f.get();  //TODO: will have to change
     
     while ((i < BUFFSIZE) && (c != '\n') && (c != '\r')) {
         if (c < 0) {
@@ -221,7 +230,7 @@ int readRawUnarchiveLine (char *line, LFile *f)
         }
         *p = c;
         p++; i++;
-        c = f->f.get();  //TODO will have to change
+        c = f->f.get();  //TODO: will have to change
     }
     
     *p = '\0';
@@ -329,8 +338,10 @@ bool DNOCR_Config::readNVPString (const char *name, char *val, int valLength)
 bool DNOCR_Config::readNVPInt (const char *name, int *val)
 {
     char buff[BUFFSIZE];
+    char *p = (char *)name;
+    if (*p == '&') p++;  // sometimes we get "&intValue"
     
-    if (!this->readNVPString(name, buff, BUFFSIZE)){
+    if (!this->readNVPString(p, buff, BUFFSIZE)){
         return false;
     } else {
         WHD_Util::cleanNumStr(buff);
@@ -340,11 +351,29 @@ bool DNOCR_Config::readNVPInt (const char *name, int *val)
     }
 }
 
+bool DNOCR_Config::readNVPLong (const char *name, long *val)
+{
+    char buff[BUFFSIZE];
+    char *p = (char *)name;
+    if (*p == '&') p++;  // sometimes we get "&intValue"
+    
+    if (!this->readNVPString(p , buff, BUFFSIZE)){
+        return false;
+    } else {
+        WHD_Util::cleanNumStr(buff);
+        if (strlen(buff ) == 0) return false;
+        *val = atol(buff);
+        return true;
+    }
+}
+
 bool DNOCR_Config::readNVPBool (const char *name, bool *val)
 {
     char  buff[BUFFSIZE];
+    char *p = (char *)name;
+    if (*p == '&') p++;  // sometimes we get "&intValue"
     
-    if (!this->readNVPString(name, buff, BUFFSIZE)){
+    if (!this->readNVPString(p, buff, BUFFSIZE)){
         return false;
     } else {
         if (strlen(buff) == 0) return false;
@@ -353,6 +382,19 @@ bool DNOCR_Config::readNVPBool (const char *name, bool *val)
         return true;
     }
 }
+
+bool DNOCR_Config::readNVPDateTime (const char * name,  datetimeInfo &dt)
+{
+    char buff [BUFFSIZE];
+    if (!this->readNVPString(name, buff, BUFFSIZE)){
+        return false;
+    } else {
+        if (strlen(buff) != 19) return false; // Must always be "yyyy-mm-dd-hh-mm-ss"
+        sscanf (buff, "%d-%d-%d-%d-%d-%d", &dt.year, &dt.mon, &dt.day, &dt.hour, &dt.min, &dt.sec);
+        return true;
+    }
+}
+
 
 int DNOCR_Config::closeRecover()
 {
