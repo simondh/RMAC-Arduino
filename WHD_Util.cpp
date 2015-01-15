@@ -12,9 +12,15 @@
 #include "DNOCR_Config.h"
 #include "WHD_Util.h"
 #include "LFlash.h"
-
+#include <iostream>
+#include <ctime>
+#include <stdio.h>
+#include <string.h>
+#include <limits.h>
 
 #define CRLF "\r\n"  // Windows line termination
+#define BUF_SIZE 256
+
 
 /*
   ** WHD_Util - mostly staic utility routines
@@ -23,6 +29,8 @@
 /*
  ** ========================== String manipulation & cleaning ===============
 */
+#pragma mark String manipulation & cleaning
+
 
 int WHD_Util::safeCopy (char *dest, char *source, int l)
 {
@@ -149,11 +157,12 @@ void WHD_Util::cleanNumStr (char *s)
 /*
  ** ========================== date & Time ===============
  */
+#pragma mark Date and Time
 
-
-int WHD_Util::dayOfEpoch()
+int ardTime::dayOfEpoch()
 {
     // return number of days since 1 Jan 2015
+    // STATIC method i.e. needs no object, call as ardTime::dayOfEpoch();
     unsigned int rtc;
     
     LDateTimeClass::getRtc(&rtc); // returns time since 1/1/1970
@@ -161,7 +170,37 @@ int WHD_Util::dayOfEpoch()
     return (int)(rtc/(24*60*60) - 45*365 - 10); // return days since 1 Jan 2015
 }
 
-void WHD_Util::timeStamp (char *dt, const char *seperators , const datetimeInfo *theDate)
+
+
+
+ardTime::ardTime( bool now)
+{
+    // Do I need to malloc? - NO!, so no need for a destructor either
+    if (now)
+    {
+        this->setArdTimeNow();
+    }else {
+        memset(&this->_dt, 0, sizeof(this->_dt));
+    }
+}
+
+ardTime::ardTime()
+{
+    memset(&this->_dt, 0, sizeof(this->_dt));
+   
+}
+
+ardTime::ardTime(char *timeStr)
+{
+    // Expect a timestamp in the form
+    // TODO: Got here !!
+    
+    setArdTimeFromStr(timeStr);
+
+}
+
+
+ void ardTime::getArdTimeStr ( char *dt, const char *seperators)
 {
     // theDate is a date struct with the time to be printed
     // 3-char separators string gives :
@@ -169,29 +208,107 @@ void WHD_Util::timeStamp (char *dt, const char *seperators , const datetimeInfo 
     // eg (datebuff, "/-:") -> yyyy/mm/dd-hh:mm:ss
     
 sprintf (dt, "%04d%c%02d%c%02d%c%02d%c%02d%c%02d ",
-         theDate->year, seperators[0], theDate->mon+1, seperators[0], theDate->day,
+         _dt.year, seperators[0], _dt.mon+1, seperators[0], _dt.day,
          seperators[1],
-         theDate->hour, seperators[2], theDate->min, seperators[2], theDate->sec);
+         _dt.hour, seperators[2], _dt.min, seperators[2], _dt.sec);
 }
 
- void WHD_Util::timeStamp (char *dt, const char *seperators )
+void ardTime::getArdTimeStr (char *str)
+{
+    // buff must be 22 chars. Returns yyyy-mm-dd hh:mm:ss
+    getArdTimeStr(str, (char *)"- :");
+}
+
+void ardTime::setArdTimeNow()
+{
+    LDateTimeClass::getTime(&_dt);
+}
+
+void ardTime::setArdTimeZero()
+{
+    memset(&this->_dt, 0, sizeof(this->_dt));
+}
+bool ardTime::setArdTimeFromStr(const char *tmStr)
+{
+    sscanf (tmStr, "%d-%d-%d-%d-%d-%d", &this->_dt.year, &this->_dt.mon, &this->_dt.day,
+                &this->_dt.hour, &this->_dt.min, &this->_dt.sec);
+    return true;
+}
+
+long ardTime::secondsDifference()
+{
+    ardTime *now = new ardTime();
+    return secondsDifference(now);
+}
+
+
+long ardTime::secondsDifference(const ardTime *secondDate)
+{
+    // returns seconds by which second date is after first date
+    // negative if second date is BEFORE first date
+    // TODO: Depends on std libary, may not work under Arduino.
+    
+    struct std::tm a ;
+    struct std::tm b ;
+    
+    a.tm_year= _dt.year;
+    a.tm_mon = _dt.mon;
+    a.tm_mday = _dt.day;
+    a.tm_hour = _dt.hour;
+    a.tm_min = _dt.min;
+    a.tm_sec = _dt.sec;
+    a.tm_gmtoff = 0;
+    a.tm_isdst = 0;
+    b.tm_year= secondDate->_dt.year;
+    b.tm_mon = secondDate->_dt.mon;
+    b.tm_mday = secondDate->_dt.day;
+    b.tm_hour = secondDate->_dt.hour;
+    b.tm_min = secondDate->_dt.min;
+    b.tm_sec = secondDate->_dt.sec;
+    b.tm_gmtoff = 0;
+    b.tm_isdst = 0;
+    
+    std::time_t x = std::mktime(&a);
+    std::time_t y = std::mktime(&b);
+    if ( x != (std::time_t)(-1) && y != (std::time_t)(-1) )
+    {
+        double difference = std::difftime(y, x);
+        return  difference ;
+    }
+    return 0;
+}
+
+long   ardTime::minutesDifference(const ardTime *startDate)
 {
     datetimeInfo now;
     LDateTimeClass::getTime(&now);
-    WHD_Util::timeStamp(dt, seperators, &now);
+    
+    return this->secondsDifference(startDate)/60;
 }
 
-
- void WHD_Util::timeStamp (char *dt )
+ unsigned long  WHD_Util::millisSince (unsigned long now, unsigned long then)
 {
-    // buff must be 22 chars. Returns yyyy-mm-dd hh:mm:ss
-    WHD_Util::timeStamp(dt, (char *)"- :");
+    // only reason this is here is that the Arduino Millis function overflows back to zero every 50 days
+    // Normally now > then, but after overflow, then > now, by a big margin
+    // makes a judgement - difference up to 10 days is a negative time, else its overflow.
+    // For longer time periods, use the date methods above.
+    
+    if (then > now) {
+        // has overflowed
+        return (ULONG_MAX - then + now -1);
+    } else
+        return (now - then);
+}
+ unsigned long WHD_Util::millisSince (unsigned long then)
+{
+    return (millisSince(millis(), then));
 }
 
 
 /*
  ** ========================== Log file ===============
  */
+#pragma mark Log File routines
 
 void writeLogString (LFile *f, const char *line)
 {
@@ -218,10 +335,11 @@ void writeLogString (LFile *f, const char *line)
     // file is created on first use and on change of day
     // and /log dir created if necessary
     
-    int i = dayOfEpoch();
+    int i = ardTime::dayOfEpoch();
     char logTypeStr[12];
     char dateTimeStr[30];
-    
+    bool verbose = VERBOSE_LOG_ON;
+    ardTime *tm = new ardTime(false);  // init, do not set to now.
     // first check /logs exists
     if (!LFlash::exists("LOGS")) {
         LFlash::mkdir("LOGS");
@@ -232,6 +350,8 @@ void writeLogString (LFile *f, const char *line)
     LFile f = LFlash::open(fn, FILE_WRITE);  // TODO: check opens as append (LinkIt should, C++ does not)
 
     switch (logType) {
+        case 'A':
+            strcpy(logTypeStr, " ALARM "); break;
         case 'I':
             strcpy(logTypeStr, " Info "); break;
         case 'W':
@@ -240,7 +360,7 @@ void writeLogString (LFile *f, const char *line)
             strcpy(logTypeStr, " Error ");break;
         case 'V' :
             strcpy(logTypeStr, " Verbose ");
-            if (!VERBOSE_LOG_ON) {
+            if (!verbose ) {
                 return;
             }
             break;
@@ -249,7 +369,8 @@ void writeLogString (LFile *f, const char *line)
             strcpy(logTypeStr, " internal error unknown log type "); break;
     }
     
-    WHD_Util::timeStamp(dateTimeStr);
+    
+    tm->getArdTimeStr(dateTimeStr);
     writeLogString(&f, dateTimeStr );
     writeLogString(&f, logTypeStr );
     writeLogString(&f, s );
@@ -260,8 +381,15 @@ void writeLogString (LFile *f, const char *line)
 
 void WHD_Util::writeLog (char logType, const char *s, const int n)
 {
-    char buff[BUFSIZ];
+    char buff[BUF_SIZE];
     sprintf(buff, "%s : %d", s, n);
+    writeLog(logType, buff);
+}
+
+void WHD_Util::writeLog (char logType, const char *s, const char *s2)
+{
+    char buff[BUF_SIZE];
+    sprintf(buff, "%s : %s", s, s2);
     writeLog(logType, buff);
 }
 
@@ -270,6 +398,8 @@ void WHD_Util::writeLog (char logType, const char *s, const int n)
 /*
  ** ========================== Error handling ===============
  */
+#pragma mark Error handling
+
 
 
  void WHD_Util::fatalError (const char * err)
@@ -286,7 +416,8 @@ void WHD_Util::writeLog (char logType, const char *s, const int n)
 
 void WHD_Util::fatalError (const char * err, const char * attr)
 {
-    char buff[BUFSIZ], *p;
+    // two strings such as fatalError ("Invalid Parameter", "siteName");
+    char buff[BUF_SIZE], *p;
     p = (char *)attr;
     if (*p == '&') p++;  // some attributes are &attribute, ignore this
     sprintf (buff, "%s : %s", err, p);
@@ -295,7 +426,7 @@ void WHD_Util::fatalError (const char * err, const char * attr)
 
 void WHD_Util::fatalError (const char * err, const int attr)
 {
-    char buff[BUFSIZ];
+    char buff[BUF_SIZE];
     sprintf (buff, "%s : %d", err, attr);
     WHD_Util::fatalError(buff);
 }

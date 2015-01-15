@@ -9,6 +9,7 @@
 #include <iostream>
 #include <string>
 #include <fstream>
+#include <unistd.h>
 #include "WHD_Util.h"
 #include "DNOCR_Config.h"
 #include "DNOCR_Rmac.h"
@@ -26,15 +27,20 @@ AuthorisedUsers *authUsers[MaxCertifiedPhones];
 
 
 /*
- **====================== Forward decalartions =================
+ **====================== Forward declarations =================
  ** Routines are after main
  **/
 
 void saveAllToConfig ();
 void restoreAllFromConfig();
+void setupAlarms();
+void checkAlarms();
 
 
-
+void say (DNOCR_Mesg *myQ)
+{
+    std::cout << "Q size : " << myQ->qSize() << std::endl;
+}
 
 /*
  **====================== main =================
@@ -43,43 +49,18 @@ void restoreAllFromConfig();
 int main(int argc, const char * argv[]) {
     
 
-    int i;
-    char buff [180];
+//    int i;
+//    char buff [180];
     
     WHD_Util::writeLog(LOG_INFO, (char*)"Testing message Q");
     
+    char cCurrentPath[FILENAME_MAX];
+        getcwd(cCurrentPath, sizeof(cCurrentPath));
+        std::cout << cCurrentPath << std::endl;
+    // TODO: debug get rid
     
-    DNOCR_Mesg *myQ = new DNOCR_Mesg(4);
-    int err;
-    
-    err = myQ->enQueue((char *)"mesg 1");
-    i = myQ->qSize();
-    err = myQ->enQueue((char *)"mesg 2");
-    i = myQ->qSize();
-    err = myQ->enQueue((char *)"mesg 3");
-    i = myQ->qSize();
-    err = myQ->enQueue((char *)"mesg 4");
-    i = myQ->qSize();
-    err = myQ->enQueue((char *)"mesg 5");
-    i = myQ->qSize();
-    err = myQ->deQueue(buff);
-    i = myQ->qSize();
-    err = myQ->deQueue(buff);
-    i = myQ->qSize();
-    err = myQ->deQueue(buff);
-    i = myQ->qSize();
-    err = myQ->deQueue(buff);
-    i = myQ->qSize();
-    err = myQ->deQueue(buff);
-    i = myQ->qSize();
-    err = myQ->deQueue(buff);
-    i = myQ->qSize();
-    
-    
-    
-    
-    exit (11);
-    
+    DNOCR_Mesg *myQ = new DNOCR_Mesg(32, &siteData);
+
     WHD_Util::writeLog(LOG_INFO, "RMAC starting up");
 
 
@@ -88,13 +69,33 @@ int main(int argc, const char * argv[]) {
     WHD_Util::writeLog(LOG_INFO, "Loading all classes from config file RMAC.DAT");
 
     restoreAllFromConfig();
+    setupAlarms();
     
-    WHD_Util::writeLog(LOG_INFO, "restoration complete, startup routines starting");
+    WHD_Util::writeLog(LOG_INFO, "restoration complete, Monitoring starts");
+    
+    //saveAllToConfig();
+    
 
 
+// MAIN LOOP
+    // In real Arduino, this is the loop() function
+    
+    while (true)
+    {
+        myQ->checkMessages();
+        if (myQ->Queued()) {
+            myQ->processMessage();
+        }
+        
+        checkAlarms();
+        
+        sleep (1);
+        std::cout << "Tick" << std::endl; ;
+        
+    }
  
     
-    saveAllToConfig();
+ //   saveAllToConfig();
     
     return 0;
 }
@@ -143,6 +144,8 @@ void restoreAllFromConfig ()
     
 } // restoreAllFromConfig
 
+
+
 void saveAllToConfig ()
 {
     // SAVES all classes to a new config file.
@@ -172,4 +175,29 @@ void saveAllToConfig ()
     
 } // saveAllToConfig ()
 
+
+void setupAlarms()
+{
+    
+    for (int i = 0; i < MaxDigitalAlarms; i++)
+    {
+        if (digitalAlarms[i]->isActive()) {
+            digitalAlarms[i]->setupAlarm();
+        }
+    }
+    
+    // TODO: Other alarms later
+}
+
+void checkAlarms()
+{
+    for (int i = 0; i < MaxDigitalAlarms; i++)
+    {
+        if (digitalAlarms[i]->isActive()) {
+            digitalAlarms[i]->checkAlarm(&siteData);
+        }
+    }
+    
+    // TODO: Other alarms later
+}
 

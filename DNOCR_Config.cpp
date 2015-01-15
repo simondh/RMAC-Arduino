@@ -7,6 +7,9 @@
 
 #include "DNOCR_Config.h"
 #include "LFlash.h"
+#include "WHD_Util.h"
+
+
 /*
  ** DNOCR_Config - Methods to manage the save and restore of classes from a Flash config file
  ** The LinkitOne has 10MB of Flash memory that is available through the LFlash class.
@@ -146,10 +149,10 @@ int DNOCR_Config::writeNVP (const char * name, const bool b)
 
 }
 
-int DNOCR_Config::writeNVP (const char * name, const datetimeInfo &dt)
+int DNOCR_Config::writeNVP (const char * name,  ardTime &dt)
 {
     char buff [64];
-    WHD_Util::timeStamp(buff, (char *)"---", &dt);  // TODO: check dont trust &
+    dt.getArdTimeStr(buff);
     return writeNVP(name,  buff);
     return 1;
 }
@@ -383,14 +386,14 @@ bool DNOCR_Config::readNVPBool (const char *name, bool *val)
     }
 }
 
-bool DNOCR_Config::readNVPDateTime (const char * name,  datetimeInfo &dt)
+bool DNOCR_Config::readNVPDateTime (const char * name,  ardTime &dt)
 {
     char buff [BUFFSIZE];
     if (!this->readNVPString(name, buff, BUFFSIZE)){
         return false;
     } else {
         if (strlen(buff) != 19) return false; // Must always be "yyyy-mm-dd-hh-mm-ss"
-        sscanf (buff, "%d-%d-%d-%d-%d-%d", &dt.year, &dt.mon, &dt.day, &dt.hour, &dt.min, &dt.sec);
+        dt.setArdTimeFromStr(buff);
         return true;
     }
 }

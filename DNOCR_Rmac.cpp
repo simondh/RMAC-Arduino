@@ -20,30 +20,42 @@
 #include "DNOCR_Config.h"
 #include "DNOCR_Rmac.h"
 #include "WHD_Util.h"
+#include "LFlash.h"
 
 // Edit these version numbers very time an attribute is added to a class.
 // NEVER remove, resequence or alter existing attributes
 // or the config files will crash horribly
-#define SITE_VERSION "1.0"      
-#define DIGITAL_ALARM_VERSION "1.0"      
+#define SITE_VERSION "1.0"
+#define DIGITAL_ALARM_VERSION "1.0"
 #define AUTH_USERS_VERSION "1.0"
 
 
 
 // nasty nasty macros as I am tired of typing
+// shorten the repetitive pattern in restore methods:
+// if (!restoreObj->readNVPInt ("alarmNum", alarmNum))
+//      WHD_Util::fatalError ("Restoring class_type error parameter:, "alarmNum");
+//
+// TODO: Here fix fatalError text
+// note NO quotes in macro parameters, screws it up a treat.
 // RNC3 for the ReadNVP{type} methods that take 3 params, ("attribute-name", attribute, sizeof(attribute)
+//      (only 2 params supplied, the Type and attribute
+//      eg RNC3 (char, paramName) ->
+//      ->readNVPchar ("paramName", paramName, sizeof(paramName)
 // RNC2 where sizef not needed, like ReadNVPBool
 // RNC3Q where 2 quoted strings needed, simple ReadNVPCheck (string, string)
+//  the double-macro parsing puts quotes around the macro value.
+
 #define PACK(str) #str
 #define QUOTE(str) PACK(str)
 
-#define RNC3(TYPE, ID) if (!restoreObj->readNVP##TYPE (QUOTE(ID), ID, sizeof(ID))) localFatalError ("DigitalAlarm", QUOTE(ID));
-#define RNC2(TYPE, ID) if (!restoreObj->readNVP##TYPE (QUOTE(ID), ID)) localFatalError ("DigitalAlarm", QUOTE(ID));
-#define RNC3Q(TYPE, C, ID) if (!restoreObj->readNVP##TYPE (QUOTE(C), QUOTE(ID))) localFatalError ("DigitalAlarm", QUOTE(ID));
+#define RNC3(TYPE, ID) if (!restoreObj->readNVP##TYPE (QUOTE(ID), ID, sizeof(ID))) WHD_Util::fatalError ("DigitalAlarm", QUOTE(ID));
+#define RNC2(TYPE, ID) if (!restoreObj->readNVP##TYPE (QUOTE(ID), ID)) WHD_Util::fatalError ("DigitalAlarm", QUOTE(ID));
+#define RNC3Q(TYPE, C, ID) if (!restoreObj->readNVP##TYPE (QUOTE(C), QUOTE(ID))) WHD_Util::fatalError ("DigitalAlarm", QUOTE(ID));
 
 
 /* A note on the F() macro - this tells Arduino (and LinkIt I hope) to keep a character string in Flash until needed.
-  so does not use up RAM */
+ so does not use up RAM */
 
 
 /*
@@ -79,7 +91,8 @@ void Site::archive (DNOCR_Config *saveObj)
     saveObj->writeSaveLine("ENDClass:Site");
     saveObj->writeSaveLine("//------");
     saveObj->writeSaveLine("");
-
+    
+    configDirty = false;
     
 }
 
@@ -109,59 +122,25 @@ void Site::unarchive (DNOCR_Config *restoreObj)
         WHD_Util::fatalError(F("Read Config file fail, bad Log File Number"));
     if (!restoreObj->readNVPCheck("ENDClass", "Site"))
         WHD_Util::fatalError(F("Read Config file fail, missing Site EndClass"));
-
+    
+    configDirty = false;
 }
 
-const char * Site::getSiteID() const
+bool Site::pinOK (char *pin, SecurityLevels securityLevel)
 {
-    return (siteID);
-}
-
-
-int Site::setSiteID(const char *name)
-{
-    // fussy, but make sure a) Name cannot overflow, and b) is null terminated
-    return (WHD_Util::safeCopy(siteID, (char *)name, sizeof(siteID)));
-}
-
-const char * Site::getSiteShortName() const
-{
-    return(siteShortName);
-}
-
-int Site::setSiteShortName(const char* name)
-{
-    return (WHD_Util::safeCopy(siteShortName, (char *)name, sizeof(siteShortName)));
-}
-
-const char * Site::getSiteLongName() const
-{
-    return(siteLongName);
-}
-
-int Site::setSiteLongName(const char* name)
-{
-    return (WHD_Util::safeCopy(siteLongName, (char *)name, sizeof(siteLongName)));
-}
-
-const char * Site::getLowSecurityPIN() const
-{
-    return(lowSecurityPIN);
-}
-
-int Site::setLowSecurityPIN(const char* name)
-{
-    return (WHD_Util::safeCopy(lowSecurityPIN, (char *)name, sizeof(lowSecurityPIN)));
-}
-
-const char * Site::getHighSecurityPIN() const
-{
-    return(highSecurityPIN);
-}
-
-int Site::setHighSecurityPIN(const char* name)
-{
-    return (WHD_Util::safeCopy(highSecurityPIN, (char *)name, sizeof(highSecurityPIN)));
+    switch (securityLevel) {
+        case sec_Low:
+            return strncmp(pin, lowSecurityPIN, sizeof(lowSecurityPIN)-1);
+            break;
+            
+        case sec_High:
+            return strncmp(pin, highSecurityPIN, sizeof(highSecurityPIN)-1);
+            break;
+            
+        default:
+            return false;
+            break;
+    }
 }
 
 
@@ -187,11 +166,91 @@ DigitalAlarm::DigitalAlarm(int alarmNum)
     
     alarmNumber = alarmNum;
     alarmed = false;
-    alarmRaisedTime = *new datetimeInfo();
-    alarmClearedTime = *new datetimeInfo();
-    //zeroDT (&alarmRaisedTime);
-    //zeroDT (&alarmClearedTime);
 }
+
+bool DigitalAlarm::isActive()
+{
+    return active;
+}
+
+void DigitalAlarm::sendDigitalAlarm(const char *typeOfAlarm)
+{
+    // does nothing yet!!
+    lastTransmitted.setArdTimeNow();
+
+}
+
+void DigitalAlarm::setupAlarm()
+{
+    pinMode(digitalPin, INPUT);
+    alarmed = false;
+    lastTransmitted.setArdTimeZero();
+    alarmRaisedTime.setArdTimeZero();
+    alarmClearedTime.setArdTimeZero();
+    sessionAlarmCount = 0;
+    bounceCount = 0;
+    lastChecked = millis();
+}
+
+void DigitalAlarm::checkAlarm (Site *site)
+{
+    if (!active) return;  // should not happen anyway...
+    if (WHD_Util::millisSince(lastChecked) < checkInterval) return;
+    // only check at set intervals.
+    
+    lastChecked = millis();
+    
+    int state = digitalRead (digitalPin);
+    
+    if ((alarmOnOpen && (state == 0)) || (!alarmOnOpen && (state != 0)))
+    {
+        // YES there is an alarm state.
+        if (bounceCount > 0) {
+            bounceCount--;
+            return; // BUT ignore it until it has been present for bounceCount intervals
+        }
+        
+        if (alarmed) {
+            // alarm has already been raised - resignal it?
+            if (!silence && ((lastTransmitted.secondsDifference()) > retransmitMinutes )){
+                // resend the alarm
+                sendDigitalAlarm("Repeat");
+            }  // else ignore, alarm has been sent and nothing to do
+        } else {
+            // NEW alarm!!
+            if (!silence){
+                sendDigitalAlarm("New");
+                WHD_Util::writeLog(LOG_ALARM, "Alarm RAISED ", alarmID);
+            } else {
+                WHD_Util::writeLog(LOG_ALARM, "Alarm RAISED but Silenced", alarmID);
+                alarmRaisedTime.setArdTimeZero(); // as not transmitted!
+            }
+            alarmed = true;
+            alarmRaisedTime.setArdTimeNow();
+            sessionAlarmCount++;
+            globalAlarmCount++;
+        }
+        
+    } else {
+        // NOT alarmed, OK - but - do we need to reset an active alarm?
+        if (alarmed) {
+            // clear the alarm
+            if (!silence){
+                sendDigitalAlarm("reset");
+                WHD_Util::writeLog(LOG_ALARM, "Alarm cleared", alarmID);
+            } else {
+                WHD_Util::writeLog(LOG_ALARM, "Alarm Cleared but Silenced", alarmID);
+            }
+            alarmed = false;
+            alarmClearedTime.setArdTimeNow();
+            bounceCount = deBounce;
+        }
+    }
+    
+    
+    
+}
+
 
 void DigitalAlarm::archive (DNOCR_Config *saveObj)
 {
@@ -201,13 +260,14 @@ void DigitalAlarm::archive (DNOCR_Config *saveObj)
     // MAKE SURE the unarchive processes the SAME attributes in the SAME order
     
     if (this == NULL) WHD_Util::fatalError("DigitalAlarm::archive THIS is null");
-
+    
     saveObj->writeNVP("Class", "DigitalAlarm");
     saveObj->writeNVP("Version", DIGITAL_ALARM_VERSION);
     
     saveObj->writeNVP("alarmNumber", (long)alarmNumber);
     saveObj->writeNVP("alarmID", alarmID);
     saveObj->writeNVP("alarmName", alarmName);
+    saveObj->writeNVP("active", active);
     saveObj->writeNVP("digitalPin", (long)digitalPin);
     saveObj->writeNVP("alarmOnOpen", alarmOnOpen);
     saveObj->writeNVP("silence", silence);
@@ -216,24 +276,20 @@ void DigitalAlarm::archive (DNOCR_Config *saveObj)
     saveObj->writeNVP("alarmRaisedTime", alarmRaisedTime);
     saveObj->writeNVP("alarmClearedTime", alarmClearedTime);
     saveObj->writeNVP("globalAlarmCount", globalAlarmCount);
+    saveObj->writeNVP("deBounce", (long)deBounce);
+    saveObj->writeNVP("checkInterval", (long)checkInterval);
+    
     saveObj->writeSaveLine("ENDClass:DigitalAlarm");
     saveObj->writeSaveLine("//------");
     saveObj->writeSaveLine("");
-  
+    
     //    saveObj->writeNVP("xx", xx);  // template
-
+    
 }
 
 
 
-void localFatalError (const char *className, const char *id)
-{
-    char buff[BUFSIZ], *p;
-    p = (char *)id;
-    if (id[0] == '&') p++;  // some attributes are &attribute, ignore this
-    sprintf (buff, "Class: %s unarchive error on attribute: %s", className, p);
-    WHD_Util::fatalError(buff);
-}
+
 
 void DigitalAlarm::unarchive (DNOCR_Config *restoreObj, const int restoreAlarmNumber)
 {
@@ -245,11 +301,11 @@ void DigitalAlarm::unarchive (DNOCR_Config *restoreObj, const int restoreAlarmNu
     
     char buff[BUFSIZ];
     if (this == NULL) WHD_Util::fatalError("DigitalAlarm::unarchive THIS is null");
-
+    
     RNC3Q(Check, Class, DigitalAlarm);
     if (!restoreObj->readNVPCheck("Version", DIGITAL_ALARM_VERSION))
-        localFatalError("Version", DIGITAL_ALARM_VERSION);
-    //RNC3Q(Check, Version, DIGITAL_ALARM_VERSION);
+        WHD_Util::fatalError("Version", DIGITAL_ALARM_VERSION);
+    
     RNC2(Int, &alarmNumber);
     if (alarmNumber != restoreAlarmNumber) {
         sprintf (buff, "unarchive DigitalAlarm expected %d got %d", restoreAlarmNumber, alarmNumber);
@@ -257,6 +313,7 @@ void DigitalAlarm::unarchive (DNOCR_Config *restoreObj, const int restoreAlarmNu
     }
     RNC3(String, alarmID);
     RNC3(String, alarmName);
+    RNC2(Bool, &active);
     RNC2(Int, &digitalPin);
     RNC2(Bool, &alarmOnOpen);
     RNC2(Bool, &silence);
@@ -265,6 +322,8 @@ void DigitalAlarm::unarchive (DNOCR_Config *restoreObj, const int restoreAlarmNu
     RNC2(DateTime , alarmRaisedTime);
     RNC2(DateTime , alarmClearedTime);
     RNC2(Long  , &globalAlarmCount);
+    RNC2(Int  , &deBounce);
+    RNC2(Int  , &checkInterval);
     RNC3Q(Check, ENDClass, DigitalAlarm);
 }
 
@@ -293,16 +352,17 @@ void AuthorisedUsers::archive (DNOCR_Config *saveObj)
     // MAKE SURE the unarchive processes the SAME attributes in the SAME order
     
     if (this == NULL) WHD_Util::fatalError("Authorised_Users::archive THIS is null");
-
+    
     saveObj->writeNVP("Class", "AuthorisedUsers");
     saveObj->writeNVP("Version", AUTH_USERS_VERSION);
     
     saveObj->writeNVP("userNumber", (long)userNumber);
+    saveObj->writeNVP("active", active);
     saveObj->writeNVP("userName", userName);
     saveObj->writeNVP("phone", phone);
     saveObj->writeNVP("securityLevel", (long)securityLevel);
     saveObj->writeSaveLine("ENDClass:AuthorisedUsers");
-
+    
     saveObj->writeSaveLine("//------");
     saveObj->writeSaveLine("");
 }
@@ -322,18 +382,19 @@ void AuthorisedUsers::unarchive (DNOCR_Config *restoreObj, const int uNum)
     
     RNC3Q(Check, Class, AuthorisedUsers);
     if (!restoreObj->readNVPCheck("Version", AUTH_USERS_VERSION))
-        localFatalError("Version", AUTH_USERS_VERSION);
+        WHD_Util::fatalError("Version", AUTH_USERS_VERSION);
     RNC2(Int, &userNumber);
     if (uNum != userNumber) {
         sprintf (buff, "unarchive Authorised User expected %d got %d", uNum, userNumber);
         WHD_Util::fatalError(buff);
     }
+    RNC2(Bool , &active);
     RNC3(String, userName);
     RNC3(String, phone);
     if (!restoreObj->readNVPInt ("securityLevel", &i))
         WHD_Util::fatalError(F("Read Config file fail, bad securityLevel Number"), i );
-    securityLevel = (SecurityLevels)i;
-
+    securityLevel = (Site::SecurityLevels)i;
+    
     RNC3Q(Check, ENDClass, AuthorisedUsers);
 }
 

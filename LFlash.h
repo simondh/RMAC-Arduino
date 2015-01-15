@@ -23,6 +23,16 @@
 // so it does not use RAM on program load
 #define F(string_literal) (string_literal)
 
+// Classless Arduino functions
+
+#define INPUT 1
+#define OUTPUT 2
+
+void pinMode (int pin, int Mode);
+unsigned long millis();
+int digitalRead (int pin);
+
+
 class LFile
 {
 public:

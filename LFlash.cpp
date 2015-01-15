@@ -12,6 +12,34 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/time.h>
+
+/**
+ **=================  'classless' functions like pinMode ===================
+ **/
+
+void pinMode(int pin, int mode)
+{
+    // does nothing
+}
+
+int digitalRead (int pin)
+{
+    return ((pin % 3) == 0);
+}
+
+unsigned long millis()
+{
+    unsigned long m;
+    struct timeval t;
+    gettimeofday(&t, nullptr);
+    m = (t.tv_sec - (45*365*24*60*60)) * 1000 + (t.tv_usec * 1000);
+    // Remember this is a crappy stub.
+    // returns secs and uSecs since 1/1/1970, subtract approx 45 years of seconds to get a rough
+    // millisecond counter.
+    return m;
+}
+
 
 /**
  **=================  LFile ===================
@@ -26,11 +54,6 @@ LFile::LFile(const char *fn, int io)
         f.open(fn, std::ifstream::out | std::ifstream::app );
     else
         f.open(fn, std::ifstream::in );
-
-    //char cCurrentPath[FILENAME_MAX];
-    
-    //    getcwd(cCurrentPath, sizeof(cCurrentPath));
-    //    std::cout << cCurrentPath << std::endl;
     
 }
 

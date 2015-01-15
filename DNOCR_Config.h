@@ -14,6 +14,7 @@
 #include <stdio.h>
 #include "WHD_Util.h"
 #include "LFlash.h"
+#include "DNOCR_Rmac.h"
 
 
 
@@ -44,7 +45,7 @@ public:
     int writeNVP (const char * name, const long v);  // NOTE to save an int, cast to (long)
     int writeNVP (const char * name, const float v);
     int writeNVP (const char * name, const bool v);
-    int writeNVP (const char * name, const datetimeInfo &dt);
+    int writeNVP (const char * name,  ardTime &dt);
     
     int closeSave();
     
@@ -55,7 +56,7 @@ public:
     bool readNVPInt (const char *name, int *val);  // returns the value as a int
     bool readNVPLong (const char *name, long *val);  // returns the value as a long
     bool readNVPBool (const char *name, bool *val); // bool
-    bool readNVPDateTime (const char * name,  datetimeInfo &dt);
+    bool readNVPDateTime (const char * name,  ardTime &dt);
 
     int closeRecover();
     

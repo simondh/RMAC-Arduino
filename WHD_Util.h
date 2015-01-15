@@ -34,11 +34,12 @@ class DNOCR_Config;
 #define CONFIGFILEEXT ".DAT"
 #define CONFIGBACKUPEXT ".BAK"
 #define CONFIGDEFAULTEXT ".CFG"
+#define LOG_ALARM 'A'   // Logs relating to alarms, (not code faults)
 #define LOG_WARN 'W'
 #define LOG_INFO 'I'
 #define LOG_ERROR 'E'
 #define LOG_VERBOSE 'V' // These are normally sent to serial port but no logged
-#define VERBOSE_LOG_ON true // unless this is true - warning log files can get big!
+const bool VERBOSE_LOG_ON = true ;// unless this is true - warning log files can get big!
 
 /*
  ** Global constants
@@ -50,10 +51,8 @@ const int MaxDigitalAlarms = 8;       // thats the number of digital channels bu
 const int MaxAnalogueChannels = 3;  // ditto 3 analogue channels
 const int MaxCertifiedPhones = 32;  // arbitrary limit
 const int MaxPhoneLength = 16;      // ITU says 15 max, plus \0
-
-enum SecurityLevels {sec_None, sec_RO, sec_Low, sec_High, sec_Admin};
+const int PINlength = 5;            // Security PIN
     
-
 /*
  ** WHD_Util - mostly static utility routines
  */
@@ -86,13 +85,12 @@ public:
 
     static void writeLog (char logType, const char *s);   // /log/RMAC000001.LOG etc
     static void writeLog (char logType, const char *s, const int n);   // /log/RMAC000001.LOG etc
-    
+    static void writeLog (char logType, const char *s, const char *s2);      
     static void fatalError (const char *);  // if program really cannot progress - just sits there flashing LEDs!
      static void fatalError (const char *, const char *);
         static void fatalError (const char *, int);
     
     // ================ Date & Time ===============
-    static int dayOfEpoch ();  // Returns number of days since 1 Jan 2015
     static void timeStamp (char *dt );
     // buff must be 22 chars. Returns yyyy-mm-dd hh:mm:ss
     static void timeStamp (char *dt, const char *seperators );
@@ -101,7 +99,42 @@ public:
     // eg (datebuff, "/-:") -> yyyy/mm/dd-hh:mm:ss
     static void timeStamp (char *dt, const char *seperators , const datetimeInfo *theDate);
     // as above but using the date supplied
+    
+    static long secondsDifference(const datetimeInfo *startDate, const datetimeInfo *endDate);
+    static long  minutesDifference (const datetimeInfo *firstDate, const datetimeInfo *secondDate);
+    // returns minutes by which second date is after first date
+    // negative if second date is BEFORE first date
+    
+    static long  secondsSince(const datetimeInfo *startDate);
 
+    static unsigned long  millisSince (unsigned long now, unsigned long then);
+    static unsigned long millisSince (unsigned long then);
+};
+
+class ardTime
+{
+    // Use Arduino time constructs to hold and maniuplate times.
+    // Basic holding structure is DatetimeInfo
+    
+public:
+    ardTime (char *str);
+    ardTime( bool now);  // inits to NOW if now is true
+    ardTime();
+    void getArdTimeStr (char *str);
+    void getArdTimeStr ( char *str, const char *separators);
+    void setArdTimeNow();
+    void setArdTimeZero();
+    bool setArdTimeFromStr(const char *tmStr);
+    long secondsDifference();
+    long secondsDifference (const ardTime *bTime);
+    long minutesDifference (const ardTime *bTime);
+    
+    static int dayOfEpoch ();  // Returns number of days since 1 Jan 2015
+    
+private:
+    datetimeInfo _dt;
+    void getArdTimeCPPTime (std::tm *stdtm);
+    
 };
 
 
