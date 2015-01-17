@@ -200,7 +200,7 @@ void DigitalAlarm::checkAlarm (Site *site)
     
     lastChecked = millis();
     
-    int state = digitalRead (digitalPin);
+    int state = digitalRead (digitalPin); // TODO: actually more complicated, depends on the pin?
     
     if ((alarmOnOpen && (state == 0)) || (!alarmOnOpen && (state != 0)))
     {
